@@ -39,6 +39,7 @@
 </template>
 
 <script setup lang="ts">
+import { isNative, nativeRoot } from "@/lib/hosted";
 import { computed, onBeforeUnmount, ref, shallowRef, watch, watchEffect } from "vue";
 import { ElMessage, useZIndex } from "element-plus";
 import { elementLocales } from "@toonflow/i18n/elementPlus";
@@ -121,9 +122,11 @@ function rememberUpdateBox() {
 }
 
 function preventPageZoom(event: WheelEvent) {
+  if (isNative && !(event.target instanceof Element && event.target.closest("#toonflow-native, #agentPanel"))) return;
   if (event.ctrlKey || event.metaKey) event.preventDefault();
 }
 function preventPageZoomShortcut(event: KeyboardEvent) {
+  if (isNative && !(event.target instanceof Element && event.target.closest("#toonflow-native, #agentPanel"))) return;
   if ((event.ctrlKey || event.metaKey) && !event.altKey && ["+", "=", "-", "0"].includes(event.key)) event.preventDefault();
 }
 // 仅取消浏览器默认缩放，继续传递事件供 Vue Flow 缩放画布。
@@ -140,7 +143,7 @@ const { currentZIndex } = useZIndex();
 watchEffect(() => document.documentElement.style.setProperty("--markdown-tooltip-z-index", String(currentZIndex.value + 1)));
 
 watchEffect(() => {
-  if (!isMobile) return;
+  if (!isMobile || isNative) return;
   // ACT: 使用 WebView 视口缩放，保持画布触摸坐标和弹出层在同一坐标系。
   document.querySelector('meta[name="viewport"]')?.setAttribute("content", `width=device-width, initial-scale=${uiSettings.value.mobileScale / 100}`);
 });
@@ -154,13 +157,14 @@ systemTheme.addEventListener("change", updateSystemTheme);
 onBeforeUnmount(() => systemTheme.removeEventListener("change", updateSystemTheme));
 
 watchEffect(() => {
-  const { theme, primaryColor, fontScale, radius } = uiSettings.value;
+  const { theme, primaryColor, fontScale, radius } = isNative ? { theme: "dark", primaryColor: "#39d99b", fontScale: 100, radius: 8 } : uiSettings.value;
   const dark = theme === "system" ? systemDark.value : theme === "dark";
   const root = document.documentElement;
   root.classList.toggle("dark", dark);
   root.setAttribute("theme-mode", dark ? "dark" : "light");
   root.style.colorScheme = dark ? "dark" : "light";
-  root.style.fontSize = `${(16 * fontScale) / 100}px`;
+  if (isNative && nativeRoot) nativeRoot.style.fontSize = `${(16 * fontScale) / 100}px`;
+  else root.style.fontSize = `${(16 * fontScale) / 100}px`;
   root.style.setProperty("--ui-radius", `${radius}px`);
   root.style.setProperty("--el-color-primary", primaryColor);
   for (let level = 1; level <= 9; level++) {
@@ -174,7 +178,7 @@ watchEffect(() => {
 </script>
 
 <style lang="scss">
-html {
+html:not([data-toonflow-native]), #toonflow-native {
   background-color: var(--el-bg-color);
   color: var(--el-text-color-primary);
 }

@@ -13,7 +13,7 @@ import ffmpeg from "./panels/pluginMarket/ffmpeg.vue";
 
 const visible = ref(false);
 let pending = false;
-const events = location.pathname.startsWith("/toonflow") ? null : new EventSource("/api/ffmpeg/events");
+const events = (location.pathname.startsWith("/toonflow") || Boolean(document.querySelector("#toonflow-native"))) ? null : new EventSource("/api/ffmpeg/events");
 if (events) events.onmessage = async event => {
   let data: { type?: string };
   try { data = JSON.parse(event.data); }

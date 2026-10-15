@@ -1,3 +1,4 @@
+import { isNative } from "./hosted";
 import axios, { type AxiosInstance } from "axios";
 import { computed, watch } from "vue";
 import { detectLocale, isRtlLocale } from "@toonflow/i18n";
@@ -36,9 +37,10 @@ export function registerApiLanguage(client: AxiosInstance) {
 }
 
 export function registerLanguage() {
-  const applyLanguage = () => setLocale(uiSettings.value.language === "system" ? detectLocale(navigator.languages) : uiSettings.value.language);
+  const applyLanguage = () => setLocale(isNative ? detectLocale([document.documentElement.lang]) : uiSettings.value.language === "system" ? detectLocale(navigator.languages) : uiSettings.value.language);
   const stopSettings = watch(() => uiSettings.value.language, applyLanguage, { immediate: true, flush: "sync" });
   const stopDocument = watch(locale, value => {
+    if (isNative) return;
     document.documentElement.lang = value;
     document.documentElement.dir = isRtlLocale(value) ? "rtl" : "ltr";
   }, { immediate: true });

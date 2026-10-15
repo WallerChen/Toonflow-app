@@ -44,6 +44,7 @@
 </template>
 
 <script setup lang="ts">
+import { nativeRoot } from "@/lib/hosted";
 import { computed, onBeforeUnmount, reactive, ref, shallowRef, watch } from "vue";
 import { IconLayoutSidebarRight, IconAppWindowBottomRight } from "@tabler/icons-vue";
 import agent from "@/components/agent/index.vue";
@@ -51,8 +52,8 @@ import agent from "@/components/agent/index.vue";
 const visible = defineModel<boolean>({ default: false });
 const emit = defineEmits<{ resize: [width: number] }>();
 const docked = ref(false);
-const hostedTop = document.documentElement.dataset.hosted === "sivideogen" ? 44 : 0;
-const viewport = reactive({ width: window.innerWidth, height: Math.max(0, window.innerHeight - hostedTop) });
+const hostedTop = ref(nativeRoot?.getBoundingClientRect().top ?? (document.documentElement.dataset.hosted === "sivideogen" ? 44 : 0));
+const viewport = reactive({ width: window.innerWidth, height: Math.max(0, window.innerHeight - hostedTop.value) });
 const gap = computed(() => Math.min(15, viewport.width / 2, viewport.height / 2));
 const maxWidth = computed(() => Math.max(0, docked.value ? viewport.width * 0.45 : viewport.width - gap.value * 2));
 const preferredWidth = ref(420);
@@ -79,7 +80,7 @@ const left = computed(() => Math.max(gap.value, Math.min(viewport.width - width.
 const top = computed(() => Math.max(gap.value, Math.min(viewport.height - height.value - bottom.value, viewport.height - gap.value - height.value)));
 const panelStyle = computed(() => ({
   left: `${docked.value ? viewport.width - width.value : left.value}px`,
-  top: `${hostedTop + (docked.value ? 0 : top.value)}px`,
+  top: `${hostedTop.value + (docked.value ? 0 : top.value)}px`,
   width: `${width.value}px`,
   height: `${height.value}px`,
 }));
@@ -175,8 +176,9 @@ function stopInteraction(event?: PointerEvent) {
 
 function resizeViewport() {
   stopInteraction();
+  hostedTop.value = nativeRoot?.getBoundingClientRect().top ?? (document.documentElement.dataset.hosted === "sivideogen" ? 44 : 0);
   viewport.width = window.innerWidth;
-  viewport.height = Math.max(0, window.innerHeight - hostedTop);
+  viewport.height = Math.max(0, window.innerHeight - hostedTop.value);
 }
 
 watch([visible, docked], () => stopInteraction());
@@ -185,9 +187,12 @@ watch(
   (value) => emit("resize", value),
   { immediate: true }
 );
+const rootObserver = nativeRoot ? new ResizeObserver(resizeViewport) : undefined;
+if (nativeRoot) rootObserver?.observe(nativeRoot);
 window.addEventListener("resize", resizeViewport);
 onBeforeUnmount(() => {
   stopInteraction();
+  rootObserver?.disconnect();
   window.removeEventListener("resize", resizeViewport);
 });
 </script>

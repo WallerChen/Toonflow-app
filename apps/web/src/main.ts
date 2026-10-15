@@ -3,7 +3,7 @@ import { ElButton, ElResult } from "element-plus";
 import { createPinia } from "pinia";
 import { createPersistedState } from "pinia-plugin-persistedstate";
 import App from "./App.vue";
-import { registerHosted } from "./lib/hosted";
+import { registerHosted, isNative } from "./lib/hosted";
 import "@/assets/main.scss";
 import "element-plus/es/components/message-box/style/css";
 import "element-plus/es/components/button/style/css";
@@ -49,8 +49,9 @@ async function notifyDesktopReady(failed = false) {
   app.use(router);
   await router.isReady();
   app.onUnmount(registerAnonymousData());
-  app.mount("#app");
+  app.mount(isNative ? "#toonflow-native" : "#app");
   isMounted = true;
+  if (isNative) { await nextTick(); window.dispatchEvent(new CustomEvent("sivideogen:studio-ready")); }
   app.onUnmount(registerDownloads());
   if (!isDesktop) return;
   if (!isRemoteConnection) app.onUnmount(registerDesktopProtocol());
@@ -64,6 +65,7 @@ async function notifyDesktopReady(failed = false) {
   if (!isRemoteConnection) void checkDesktopUpdate(true).catch(() => {});
 }).catch(async (error) => {
   console.error("页面初始化失败：", error);
+  if (isNative) { window.dispatchEvent(new CustomEvent("sivideogen:studio-error")); return; }
   if (isMounted) app.unmount();
   const disconnecting = ref(false);
   const recoveryError = ref("");

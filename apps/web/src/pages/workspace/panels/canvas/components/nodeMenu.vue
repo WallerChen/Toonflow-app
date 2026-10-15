@@ -248,7 +248,7 @@ async function openMenu(event: MouseEvent | TouchEvent, nodesOnly = false, selec
   nodePosition = screenToFlowCoordinate({ x: clientX, y: clientY });
   const hosted = document.documentElement.dataset.hosted === "sivideogen";
   const anchorX = hosted ? Math.max(12, Math.min(clientX, window.innerWidth - 210)) : clientX;
-  const anchorY = hosted ? Math.max(56, Math.min(clientY, window.innerHeight - 380)) : clientY;
+  const anchorY = hosted ? Math.max((document.querySelector("#toonflow-native")?.getBoundingClientRect().top ?? 44) + 12, Math.min(clientY, window.innerHeight - 380)) : clientY;
   menuAnchor.value = { getBoundingClientRect: () => new DOMRect(anchorX, anchorY, 0, 0) };
   if (handle) {
     const bounds = flow.vueFlowRef.value!.getBoundingClientRect();

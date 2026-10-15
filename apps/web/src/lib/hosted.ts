@@ -1,11 +1,29 @@
 import axios from "axios";
 import { openHostedCut } from "./hostedCut";
-export const isHosted = location.pathname.startsWith("/toonflow");
+export const nativeRoot = document.querySelector<HTMLElement>("#toonflow-native");
+export const isNative = Boolean(nativeRoot);
+export const isHosted = isNative || location.pathname.startsWith("/toonflow");
 
 /** Branding and account navigation for the self-hosted SiVideoGen distribution. */
 export function registerHosted() {
   if (!isHosted) return;
   const chinese = (new URLSearchParams(location.search).get("lang") ?? document.documentElement.lang).toLowerCase().startsWith("zh");
+  if (isNative) {
+    document.documentElement.dataset.hosted = "sivideogen";
+    document.documentElement.dataset.toonflowNative = "true";
+    const style = document.createElement("style");
+    style.textContent = `#toonflow-native{height:100%;min-height:0;overflow:hidden;color:var(--el-text-color-primary);background:var(--el-bg-color)}#toonflow-native .workspacePage{height:100%!important}#toonflow-native .home{height:100%;min-height:0;overflow:hidden}#toonflow-native .home>.pageHeader{flex-shrink:0}#toonflow-native .home>.pageContent{min-height:0;overflow-y:auto;overscroll-behavior-y:contain;padding-bottom:max(56px,env(safe-area-inset-bottom))}html[data-toonflow-native] .nodeMenu{max-height:min(360px,calc(100dvh - 180px));overflow-y:auto}`;
+    document.head.append(style);
+    window.addEventListener("sivideogen:studio-cut", () => void openHostedCut());
+    void fetch("/api/hosted/info").then(response => response.json()).then(result => {
+      window.dispatchEvent(new CustomEvent("sivideogen:studio-info", { detail: { testing: Boolean(result.data?.testing) } }));
+    }).catch(() => {});
+    axios.interceptors.request.use(config => {
+      if (config.url?.startsWith("https://api.toonflow.net")) throw new Error("Models and extensions are managed by SiVideoGen.");
+      return config;
+    });
+    return;
+  }
   document.title = "SiVideoGen · Short drama & anime studio";
   document.documentElement.dataset.hosted = "sivideogen";
   const style = document.createElement("style");

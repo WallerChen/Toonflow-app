@@ -2640,5 +2640,6 @@
   "框选节点": "Box-select nodes",
   "追加选择": "Add to selection",
   "追加选择只绑定修饰键，例如 Ctrl 或 Meta。": "Add to selection accepts only modifier keys, such as Ctrl or Meta.",
-  "短剧与动漫创作": "Drama & anime studio"
+  "短剧与动漫创作": "Drama & anime studio",
+  "界面语言使用网站顶部的语言菜单切换，外观与 SiVideoGen 工作台保持一致。": "Use the language menu in the site header. Appearance follows your SiVideoGen workspace."
 }
