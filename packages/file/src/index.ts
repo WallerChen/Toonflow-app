@@ -18,6 +18,7 @@ export const stat = promises.stat;
 export const lstat = promises.lstat;
 export const realpath = promises.realpath;
 export const chmod = promises.chmod;
+export const chown = promises.chown;
 export const mkdtemp = promises.mkdtemp;
 export const existsSync = native.existsSync;
 export const statSync = native.statSync;

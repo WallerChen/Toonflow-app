@@ -6,9 +6,9 @@
         <el-badge isDot :hidden="!hasDesktopUpdate">
           <el-button round size="large" :icon="IconSettings" :aria-label="hasDesktopUpdate ? '设置，有新版本可用' : '设置'" @click="settingsVisible = true">设置</el-button>
         </el-badge>
-        <el-button round size="large" :type="deviceHubEnabled ? 'success' : undefined" :plain="deviceHubEnabled" :icon="deviceHubEnabled || mobileConnection.mode === 'remote' ? IconDeviceDesktop : IconQrcode" @click="mobileConnectVisible = true">{{ mobileConnectionLabel }}</el-button>
+        <el-button v-if="!isHosted" round size="large" :type="deviceHubEnabled ? 'success' : undefined" :plain="deviceHubEnabled" :icon="deviceHubEnabled || mobileConnection.mode === 'remote' ? IconDeviceDesktop : IconQrcode" @click="mobileConnectVisible = true">{{ mobileConnectionLabel }}</el-button>
       </div>
-      <div class="githubAction">
+      <div v-if="!isHosted" class="githubAction">
         <span class="arrowHint starHint">
           点个 Star 支持一下
           <svg viewBox="0 0 84 44" fill="none" aria-hidden="true">
@@ -22,7 +22,7 @@
       <section class="creationPanel" aria-label="创建项目">
         <div class="brand">
           <el-image class="brandLogo" :src="logoUrl" fit="contain" alt="Toonflow" />
-          <h1>Toonflow</h1>
+          <h1>{{ isHosted ? "短剧与动漫创作" : "Toonflow" }}</h1>
         </div>
         <div class="promptArea">
           <span class="arrowHint inspirationHint">
@@ -113,6 +113,7 @@ import attachmentList from "@/components/agent/attachmentList.vue";
 import { createPastedTextFile, readTextAttachment } from "@/components/agent/textAttachments";
 import type { AgentAttachment } from "@/components/agent/types";
 import logoUrl from "@toonflow/assets/logo.svg";
+import { isHosted } from "@/lib/hosted";
 import { useWorkspaceStore, type Project } from "@/stores/workspace";
 import { hasDesktopUpdate } from "@/stores/desktopUpdate";
 import { deviceHubEnabled, mobileConnection, mobileConnectionLabel } from "@/lib/mobile";

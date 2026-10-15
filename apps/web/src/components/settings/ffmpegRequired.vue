@@ -13,8 +13,8 @@ import ffmpeg from "./panels/pluginMarket/ffmpeg.vue";
 
 const visible = ref(false);
 let pending = false;
-const events = new EventSource("/api/ffmpeg/events");
-events.onmessage = async event => {
+const events = location.pathname.startsWith("/toonflow") ? null : new EventSource("/api/ffmpeg/events");
+if (events) events.onmessage = async event => {
   let data: { type?: string };
   try { data = JSON.parse(event.data); }
   catch { return; }
@@ -28,14 +28,14 @@ events.onmessage = async event => {
     await ElMessageBox.confirm("当前操作需要 FFmpeg，但尚未检测到可用版本。是否下载并安装？", "需要 FFmpeg", {
       confirmButtonText: "下载并安装", cancelButtonText: "暂不下载", closeOnClickModal: false,
     });
-    if (events.readyState !== EventSource.CLOSED) visible.value = true;
+    if (events?.readyState !== EventSource.CLOSED) visible.value = true;
   } catch {
     // 用户取消后保留当前操作的失败结果，不自动重新生成媒体。
   } finally {
     pending = false;
   }
 };
-onBeforeUnmount(() => events.close());
+onBeforeUnmount(() => events?.close());
 </script>
 
 <style scoped>

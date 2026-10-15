@@ -10,8 +10,8 @@
     :fullscreenVisible="false"
     style="width: 360px">
     <template #topActions>
-      <el-button :icon="IconScissors" :disabled="busy || !previewUrl" text title="截取音频" aria-label="截取音频" @click.stop="actions?.open('clip')">截取</el-button>
-      <el-button :icon="IconGauge" :disabled="busy || !previewUrl" text title="音频变速" aria-label="音频变速" @click.stop="actions?.open('speed')">变速</el-button>
+      <el-button v-if="!hostedAudioTools" :icon="IconScissors" :disabled="busy || !previewUrl" text title="截取音频" aria-label="截取音频" @click.stop="actions?.open('clip')">截取</el-button>
+      <el-button v-if="!hostedAudioTools" :icon="IconGauge" :disabled="busy || !previewUrl" text title="音频变速" aria-label="音频变速" @click.stop="actions?.open('speed')">变速</el-button>
       <el-button :icon="IconTransfer" :loading="uploading" :disabled="busy" text title="替换音频" aria-label="替换音频" @click.stop="fileInput?.click()">替换音频</el-button>
       <input ref="fileInput" type="file" accept="audio/*" hidden aria-label="选择替换音频" :disabled="busy" @change="replaceOutput" />
     </template>
@@ -24,6 +24,7 @@
       <el-card v-else class="promptCard" shadow="never" :bodyStyle="{ padding: '14px 16px 12px' }">
         <referenceItem v-if="refList.length" v-model="refList" @preview="setReferencePreview" @remove="removeReference" />
         <promptInput v-model="data.promptModel" v-model:text="data.prompt" :references="referenceMentions" placeholder="描述您想要的音频效果或输入待朗读文本" expandable />
+        <p v-if="hostedAudio" style="font-size:12px;opacity:.65;margin:6px 0">50–6000 characters · MP3 · 44.1 kHz</p>
         <div class="promptFooter">
           <el-select
             v-model="data.model"
@@ -41,13 +42,13 @@
               <el-option v-for="item in provider.models" :key="item.modelId" :label="item.label" :value="JSON.stringify([item.providerId, item.modelId])" />
             </el-option-group>
           </el-select>
-          <generationSettings v-model:language="data.language" v-model:sampleRate="data.sampleRate" v-model:format="data.format" :disabled="busy || !selectedModel" />
+          <generationSettings v-model:voice="data.voice" v-model:language="data.language" v-model:sampleRate="data.sampleRate" v-model:format="data.format" :disabled="busy || !selectedModel" />
           <div class="generationActions">
-            <mediaPrice v-if="generationInput" :input="{ ...generationInput, mediaType: 'audio' }" :supported="selectedModel?.supportsPrice === true" />
+            <mediaPrice v-if="generationInput && (!hostedAudio || generationPrompt.length >= 50)" :input="{ ...generationInput, mediaType: 'audio' }" :supported="selectedModel?.supportsPrice === true" />
             <el-button
               class="sendButton"
               :icon="generating ? IconPlayerStop : IconArrowUp"
-              :disabled="deleting || uploading || actions?.processing || (!generating && (!generationPrompt || !selectedModel))"
+              :disabled="deleting || uploading || actions?.processing || (!generating && (!generationPrompt || !selectedModel || (hostedAudio && (generationPrompt.length < 50 || generationPrompt.length > 6000))))"
               :title="generating ? '停止生成' : '生成音频'"
               :aria-label="generating ? '停止生成' : '生成音频'"
               @click="generating ? generationController?.abort() : startGeneration().catch(error => showNodeError(error, '音频生成失败'))" />
@@ -60,6 +61,7 @@
 </template>
 
 <script setup lang="ts">
+const hostedAudioTools = typeof document !== "undefined" && document.documentElement.dataset.hosted === "sivideogen";
 import { computed, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElLoading, ElOption, ElOptionGroup, ElSelect } from "element-plus";
 import { IconArrowUp, IconGauge, IconMusicBolt, IconPlayerStop, IconScissors, IconTransfer } from "@tabler/icons-vue";
@@ -74,26 +76,28 @@ import promptInput from "@toonflow/node-shared/promptInput";
 import referenceItem from "@toonflow/node-shared/referenceItem";
 import mediaPrice from "@toonflow/node-shared/mediaPrice";
 import generationSettings from "./components/generationSettings.vue";
-import { formatOptions, languageOptions, sampleRateOptions } from "./audioSettings";
+import { formatOptions, languageOptions, sampleRateOptions, hostedAudio } from "./audioSettings";
 
 defineOptions({
   inheritAttrs: false,
   icon: IconMusicBolt,
   handles: [
-    { id: "in", type: "target", dataType: ["IMAGE", "AUDIO", "STRING"], label: "图片或音频限1个，文本不限" },
+    { id: "in", type: "target", dataType: hostedAudio ? ["STRING"] : ["IMAGE", "AUDIO", "STRING"], label: hostedAudio ? "Text" : "图片或音频限1个，文本不限" },
     { id: "audio", type: "source", dataType: "AUDIO", label: "音频输出" },
   ] satisfies NodeHandle[],
 });
 const vLoading = ElLoading.directive;
 const { id, node, nodeProps, nodeEvent, outputs, files, ai, updateNodeInternals } = useNode({ label: "音频生成" });
 type PromptModel = NonNullable<InstanceType<typeof promptInput>["$props"]["modelValue"]>;
-const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; language: string; sampleRate: number; format: string });
+const data = computed(() => node.data as { prompt: string; promptModel: PromptModel; model: string; voice: string; language: string; sampleRate: number; format: string });
 data.value.prompt ??= "";
 data.value.promptModel ??= [];
 data.value.model ??= "";
-data.value.language ??= "zh-CN";
+data.value.language ??= hostedAudio ? "en" : "zh-CN";
+data.value.voice ??= "eve";
 data.value.sampleRate ??= 24000;
 data.value.format ??= "wav";
+if (hostedAudio) { data.value.sampleRate = 44100; data.value.format = "mp3"; if (data.value.language === "zh-CN") data.value.language = "zh"; }
 const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences();
 const models = ref<NodeMediaModel[]>([]);
 const modelsLoading = ref(false);
@@ -123,6 +127,7 @@ const generationInput = computed<Omit<NodeAudioRequest, "directory"> | undefined
     providerId: choice.providerId,
     modelId: choice.modelId,
     prompt: generationPrompt.value,
+    ...(hostedAudio ? { voice: data.value.voice } : {}),
     language: data.value.language,
     sampleRate: data.value.sampleRate,
     format: data.value.format,

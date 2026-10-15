@@ -15,8 +15,10 @@
       <div class="settingsFields">
         <div class="settingField">
           <span class="fieldLabel">语种</span>
-          <el-segmented v-model="language" :options="languageOptions" :disabled="disabled" block aria-label="音频语种" />
+          <el-select v-if="hostedAudio" v-model="language" :disabled="disabled" aria-label="旁白语言"><el-option v-for="option in languageOptions" :key="option.value" :label="option.label" :value="option.value"/></el-select>
+          <el-segmented v-else v-model="language" :options="languageOptions" :disabled="disabled" block aria-label="音频语种" />
         </div>
+        <div v-if="hostedAudio" class="settingField"><span class="fieldLabel">声线</span><el-select v-model="voice" :disabled="disabled" aria-label="旁白声线"><el-option v-for="option in ['eve','leo','ara']" :key="option" :label="option" :value="option"/></el-select></div>
         <div class="settingField">
           <span class="fieldLabel">采样率</span>
           <el-segmented v-model="sampleRate" :options="sampleRates" :disabled="disabled" block aria-label="音频采样率" />
@@ -33,15 +35,16 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { ElButton, ElPopover, ElSegmented } from "element-plus";
+import { ElButton, ElPopover, ElSegmented, ElSelect, ElOption } from "element-plus";
 import { IconAdjustmentsHorizontal, IconChevronDown, IconChevronUp } from "@tabler/icons-vue";
-import { languageOptions, sampleRateOptions, formatOptions } from "../audioSettings";
+import { languageOptions, sampleRateOptions, formatOptions, hostedAudio } from "../audioSettings";
 
 defineProps<{ disabled?: boolean }>();
 const settingsVisible = ref(false);
 const language = defineModel<string>("language", { required: true });
 const sampleRate = defineModel<number>("sampleRate", { required: true });
 const format = defineModel<string>("format", { required: true });
+const voice = defineModel<string>("voice", { default: "eve" });
 const formatLabels: Record<string, string> = { wav: "WAV", mp3: "MP3", pcm: "PCM", ogg_opus: "Ogg Opus" };
 const sampleRates = sampleRateOptions.map(value => ({ label: `${value / 1000}k`, value }));
 const formats = formatOptions.map(value => ({ label: value === "ogg_opus" ? "Opus" : formatLabels[value], value }));

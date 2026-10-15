@@ -3,6 +3,7 @@ import { ElButton, ElResult } from "element-plus";
 import { createPinia } from "pinia";
 import { createPersistedState } from "pinia-plugin-persistedstate";
 import App from "./App.vue";
+import { registerHosted } from "./lib/hosted";
 import "@/assets/main.scss";
 import "element-plus/es/components/message-box/style/css";
 import "element-plus/es/components/button/style/css";
@@ -20,6 +21,7 @@ import { checkDesktopUpdate } from "@/stores/desktopUpdate";
 import { registerLanguage } from "@/lib/i18n";
 import { locale, translate } from "@toonflow/i18n/vue";
 
+registerHosted();
 const app = createApp(App);
 app.onUnmount(registerLanguage());
 const requiresWebView2Update = isDesktop && /Windows/i.test(navigator.userAgent)

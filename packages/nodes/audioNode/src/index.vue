@@ -10,8 +10,8 @@
     :fullscreenVisible="false"
     style="width: 360px">
     <template #topActions>
-      <el-button :icon="IconScissors" :disabled="!previewUrl || uploading || actions?.processing" text title="截取音频" aria-label="截取音频" @click.stop="actions?.open('clip')">截取</el-button>
-      <el-button :icon="IconGauge" :disabled="!previewUrl || uploading || actions?.processing" text title="音频变速" aria-label="音频变速" @click.stop="actions?.open('speed')">变速</el-button>
+      <el-button v-if="!hostedAudioTools" :icon="IconScissors" :disabled="!previewUrl || uploading || actions?.processing" text title="截取音频" aria-label="截取音频" @click.stop="actions?.open('clip')">截取</el-button>
+      <el-button v-if="!hostedAudioTools" :icon="IconGauge" :disabled="!previewUrl || uploading || actions?.processing" text title="音频变速" aria-label="音频变速" @click.stop="actions?.open('speed')">变速</el-button>
       <el-button
         :icon="IconTransfer"
         :loading="uploading"
@@ -47,6 +47,7 @@
 </template>
 
 <script setup lang="ts">
+const hostedAudioTools = typeof document !== "undefined" && document.documentElement.dataset.hosted === "sivideogen";
 import { computed, ref } from "vue";
 import { IconMusic, IconUpload, IconTransfer, IconScissors, IconGauge } from "@tabler/icons-vue";
 import { ElButton, ElMessage } from "element-plus";
