@@ -21,7 +21,7 @@ The actor reads `/api/studio/catalog` from the existing site. Image/video jobs a
 
 Every media request queries the current fal base endpoint unit price, compares it with the site's credit catalog, and journals the quote before submission. Unsupported units or increases above the catalog charge stop the request. This is not a comparison of every resolution-specific tier or every provider. SeeAPI's actual paid conversion cost is unconfirmed; no plan was purchased and no SeeAPI route is claimed to be cheaper.
 
-The canvas shows the credit estimate before the generation button. A request journal prevents automatic paid resubmission after ambiguous submission. The original video history remains the recovery surface for interrupted jobs. Two to six finished own shots can be ordered and stitched into an MP4 using the existing free stitch endpoint. Trimming, extracting audio and changing speed are hidden until those capabilities have a managed implementation.
+The canvas shows the credit estimate before the generation button. A request journal prevents automatic paid resubmission after ambiguous submission. The original video history remains the recovery surface for interrupted jobs. Two to six finished own shots can be ordered and stitched into an MP4 using the existing free stitch endpoint. Trimming, extracting audio, changing speed and masked inpainting are hidden until those capabilities have a managed implementation. The hosted add-node menu is clamped to the embedded viewport and scrolls when needed.
 
 ## Railway service
 
@@ -44,7 +44,7 @@ Required server variables:
 
 Never configure `CFS_LOCAL_SESSION_FILE` in production. It is a loopback-only development shortcut using a local QA session file.
 
-Deploy from this repository using `railway up --service toonflow --detach --yes`. An alternative local Docker deployment is in `hostedCompose.yaml`. Do not expose the upstream standalone server directly.
+The production service is connected to the GitHub branch `WallerChen/Toonflow-app:codex/sivideogen-integration` for source builds. You can also deploy from this repository using `railway up --service toonflow --detach --yes`. An alternative local Docker deployment is in `hostedCompose.yaml`. Do not expose the upstream standalone server directly.
 
 ## Verification
 

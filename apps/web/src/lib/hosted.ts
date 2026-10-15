@@ -11,6 +11,9 @@ export function registerHosted() {
   const style = document.createElement("style");
   style.textContent = `html[data-hosted] body{padding-top:44px;box-sizing:border-box;height:100dvh;overflow:hidden}html[data-hosted] #app{height:calc(100dvh - 44px)}html[data-hosted] .workspacePage{height:100%!important}html[data-hosted] .home{min-height:calc(100dvh - 44px)}#cfsHostedBar{height:44px;position:fixed;inset:0 0 auto;z-index:9999;display:flex;align-items:center;gap:16px;padding:0 18px;background:#111214;border-bottom:1px solid #292b30;color:#e4e6e9;font:13px/1.4 system-ui}#cfsHostedBar a{color:#65e9b6;text-decoration:none;min-height:44px;display:flex;align-items:center}#cfsHostedBar small{margin-left:auto;color:#a9afb7}@media(max-width:640px){#cfsHostedBar{gap:10px;padding:0 10px}#cfsHostedBar small,#cfsHostedBar .cfsHostedTitle{display:none}#cfsHostedBar .cfsHostedTest{font-size:10px!important}}`;
   document.head.append(style);
+  const menuStyle = document.createElement("style");
+  menuStyle.textContent = "html[data-hosted] .nodeMenu{max-height:min(360px,calc(100dvh - 120px));overflow-y:auto}";
+  document.head.append(menuStyle);
   const bar = document.createElement("nav");
   bar.id = "cfsHostedBar";
   bar.setAttribute("aria-label", "SiVideoGen studio");

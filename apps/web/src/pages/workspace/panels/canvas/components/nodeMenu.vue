@@ -246,7 +246,10 @@ async function openMenu(event: MouseEvent | TouchEvent, nodesOnly = false, selec
   if (!point) return;
   const { clientX, clientY } = point;
   nodePosition = screenToFlowCoordinate({ x: clientX, y: clientY });
-  menuAnchor.value = { getBoundingClientRect: () => new DOMRect(clientX, clientY, 0, 0) };
+  const hosted = document.documentElement.dataset.hosted === "sivideogen";
+  const anchorX = hosted ? Math.max(12, Math.min(clientX, window.innerWidth - 210)) : clientX;
+  const anchorY = hosted ? Math.max(56, Math.min(clientY, window.innerHeight - 380)) : clientY;
+  menuAnchor.value = { getBoundingClientRect: () => new DOMRect(anchorX, anchorY, 0, 0) };
   if (handle) {
     const bounds = flow.vueFlowRef.value!.getBoundingClientRect();
     // ACT: VueFlow 在释放后清空拖线；菜单期间复用其预览，避免创建临时节点或边。
