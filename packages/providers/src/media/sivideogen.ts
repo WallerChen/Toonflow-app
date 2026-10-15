@@ -21,7 +21,7 @@ export default {
   models: [],
   async getPrice(request) {
     const result = await call(this, "quote", { ...request, references: request.images?.length || (request.type === "video" && request.firstFrame ? 1 : 0) });
-    return { price: `${result.credits} credits`, tips: `fal · checked ${result.checkedAt}` };
+    return { price: `${result.credits} credits`, tips: `${result.provider ?? "managed"} · checked ${result.checkedAt}` };
   },
   async getBalance() {
     const result = await call(this, "balance");

@@ -7,6 +7,8 @@
         </transition>
       </router-view>
       <ffmpegRequired />
+      <hostedTemplates v-if="isHosted" />
+      <hostedCut v-if="isHosted" />
       <updateBox
         v-if="updateBoxBuild && !installFailure"
         v-model="updateBoxVisible"
@@ -39,7 +41,9 @@
 </template>
 
 <script setup lang="ts">
-import { isNative, nativeRoot } from "@/lib/hosted";
+import hostedTemplates from "@/components/hostedTemplates.vue";
+import hostedCut from "@/components/hostedCut.vue";
+import { isHosted, isNative, nativeRoot } from "@/lib/hosted";
 import { computed, onBeforeUnmount, ref, shallowRef, watch, watchEffect } from "vue";
 import { ElMessage, useZIndex } from "element-plus";
 import { elementLocales } from "@toonflow/i18n/elementPlus";

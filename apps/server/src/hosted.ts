@@ -1,3 +1,4 @@
+import { hostedExport } from "./hostedExports";
 import { createHmac, timingSafeEqual, createHash, randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 import { mkdir, readFile, writeAtomic, readdir, copyFile } from "@toonflow/file";
@@ -202,8 +203,9 @@ const server = Bun.serve({
       }
       const actor = await actorFor(identity.user, identity.session);
       if (url.searchParams.has("lang")) actor.language = url.searchParams.get("lang")!.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
-      const actorPort = await actor.port;
       const pathname = url.pathname.startsWith("/api/toonflow/") ? url.pathname.slice("/api/toonflow".length) : url.pathname.replace(/^\/toonflow/, "") || "/";
+      if (pathname === "/api/hosted/exports" || pathname.startsWith("/api/hosted/exports/")) return await hostedExport(request, pathname, actor, site, id => account(actor, `/api/studio/core/api/jobs/${id}`));
+      const actorPort = await actor.port;
       const target = new URL(`http://127.0.0.1:${actorPort}${pathname}${url.search}`);
       const origin = target.origin;
       const headers = new Headers({ "x-cfs-actor-credential": actor.credential, "x-toonflow-local-client": "0", "x-toonflow-workspace": "1", origin, referer: `${origin}/` });
