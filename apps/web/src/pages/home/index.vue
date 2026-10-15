@@ -22,7 +22,7 @@
       <section class="creationPanel" aria-label="创建项目">
         <div class="brand">
           <el-image class="brandLogo" :src="logoUrl" fit="contain" alt="Toonflow" />
-          <h1>{{ isHosted ? "短剧与动漫创作" : "Toonflow" }}</h1>
+          <h1>{{ isHosted ? translate("短剧与动漫创作") : "Toonflow" }}</h1>
         </div>
         <div class="promptArea">
           <span class="arrowHint inspirationHint">
