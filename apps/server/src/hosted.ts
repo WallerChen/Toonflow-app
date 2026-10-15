@@ -211,6 +211,9 @@ const server = Bun.serve({
       for (const name of ["content-type", "accept", "accept-language", "range"]) { const value = request.headers.get(name); if (value) headers.set(name, value); }
       const response = await fetch(target, { method: request.method, headers, body: ["GET", "HEAD"].includes(request.method) ? undefined : request.body, redirect: "manual" });
       const result = new Headers(response.headers); result.delete("set-cookie"); result.set("cache-control", "private, no-store");
+      // Media generation sends JSON whitespace heartbeats while the provider renders.
+      // Forward them immediately so the edge does not time out a successful paid job.
+      if (pathname === "/api/ai/media/generate") return new Response(response.body, { status: response.status, headers: result });
       // The unmodified editor uses root API URLs, including its bundled node extensions.
       if (/(javascript|application\/json|text\/html|text\/css)/.test(result.get("content-type") ?? "")) {
         result.delete("content-length"); result.delete("content-encoding");
