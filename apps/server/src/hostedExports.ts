@@ -64,10 +64,11 @@ export async function hostedExport(request: Request, pathname: string, actor: Ac
     const id = createHash("sha256").update(JSON.stringify({ jobId, cues })).digest("hex");
     const directory = resolve(root, id), key = `${actor.directory}:${id}`;
     const previous = await readFile(resolve(directory, "state.json"), "utf8").then(JSON.parse).catch((cause: NodeJS.ErrnoException) => { if (cause.code !== "ENOENT") throw cause; return null; });
-    if (previous?.state === "ready" || running.has(key)) return reply(previous);
+    if (previous?.state === "ready") return reply(previous);
+    if (running.has(key)) return reply(previous ?? { id, jobId, cues, state: "rendering", createdAt: Date.now() });
     // ACT: one renderer on the 1-CPU host; bounded private exports prevent unbounded work per account.
-    if (running.size) throw failure("Another subtitle export is running. Try again shortly.", 429);
     if (!previous && (await readdir(root)).length >= 20) throw failure("This account has reached its saved subtitle export limit.", 409);
+    if (running.size) throw failure("Another subtitle export is running. Try again shortly.", 429);
     running.add(key); actor.active++;
     const state: ExportState = { id, jobId, cues, state: "rendering", createdAt: Date.now() };
     try { await mkdir(directory, { recursive: true }); await writeAtomic(resolve(directory, "state.json"), JSON.stringify(state)); }
@@ -93,10 +94,11 @@ export async function hostedExport(request: Request, pathname: string, actor: Ac
   if (kind !== "video" || new URL(request.url).searchParams.get("download") === "1") headers.set("content-disposition", `attachment; filename="short-drama-${name}"`);
   const range = request.headers.get("range");
   if (range) {
-    const bytes = /^bytes=(\d+)-(\d*)$/.exec(range);
-    if (!bytes) return new Response(null, { status: 416, headers: { "content-range": `bytes */${asset.size}` } });
-    const start = Number(bytes[1]), end = Math.min(bytes[2] ? Number(bytes[2]) : asset.size - 1, asset.size - 1);
-    if (start > end) return new Response(null, { status: 416, headers: { "content-range": `bytes */${asset.size}` } });
+    const bytes = /^bytes=(\d*)-(\d*)$/.exec(range);
+    if (!bytes || (!bytes[1] && !bytes[2])) return new Response(null, { status: 416, headers: { "content-range": `bytes */${asset.size}` } });
+    const start = bytes[1] ? Number(bytes[1]) : Math.max(0, asset.size - Number(bytes[2]));
+    const end = bytes[1] && bytes[2] ? Math.min(Number(bytes[2]), asset.size - 1) : asset.size - 1;
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end) return new Response(null, { status: 416, headers: { "content-range": `bytes */${asset.size}` } });
     headers.set("content-range", `bytes ${start}-${end}/${asset.size}`); headers.set("content-length", String(end - start + 1));
     return new Response(request.method === "HEAD" ? null : asset.slice(start, end + 1), { status: 206, headers });
   }

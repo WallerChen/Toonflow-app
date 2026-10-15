@@ -158,7 +158,9 @@ async function bridge(request: Request, url: URL) {
   if (path === "stitch") {
     const body = await request.json() as { jobIds?: string[] };
     if (!Array.isArray(body.jobIds) || body.jobIds.length < 2 || body.jobIds.length > 6 || new Set(body.jobIds).size !== body.jobIds.length) throw error("Choose two to six different shots in order.");
-    return json(await account(actor, "/api/studio/core/api/stitch", { jobIds: body.jobIds, title: "Toonflow final cut" }));
+    const result = await account(actor, "/api/studio/core/api/stitch", { jobIds: body.jobIds, title: "Toonflow final cut" });
+    await writeAtomic(resolve(actor.directory, `operation${result.job.id}.json`), JSON.stringify({ type: "video", jobId: result.job.id, createdAt: Date.now() }));
+    return json(result);
   }
   if (path.startsWith("job/")) {
     const id = path.slice(4);
