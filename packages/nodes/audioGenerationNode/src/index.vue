@@ -151,10 +151,9 @@ nodeEvent.on("canConnect", (connection, context) => {
 });
 
 onMounted(() => {
-  void resumeGeneration();
   window.addEventListener("toonflow:plugin-installed", refreshProviderModels);
   window.addEventListener("toonflow:provider-config-changed", refreshProviderModels);
-  void refreshProviderModels();
+  void refreshProviderModels().finally(() => { if (!disposed) void resumeGeneration(); });
 });
 onScopeDispose(() => {
   disposed = true;

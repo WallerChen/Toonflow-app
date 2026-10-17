@@ -241,10 +241,9 @@ const previewUrl = files.useFileUrl(
 );
 
 onMounted(() => {
-  void resumeGeneration();
   window.addEventListener("toonflow:plugin-installed", refreshProviderModels);
   window.addEventListener("toonflow:provider-config-changed", refreshProviderModels);
-  void loadModels().catch(error => { if (!disposed) showNodeError(error, "模型读取失败"); });
+  void loadModels().catch(error => { if (!disposed) showNodeError(error, "模型读取失败"); }).finally(() => { if (!disposed) void resumeGeneration(); });
 });
 onScopeDispose(() => {
   disposed = true;
