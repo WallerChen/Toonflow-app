@@ -9,7 +9,7 @@ const bridge = process.env.CFS_ACTOR_BRIDGE!;
 const credential = process.env.CFS_ACTOR_CREDENTIAL!;
 if (!dataDirectory || !bridge || !credential) throw new Error("Use the hosted launcher to start this editor.");
 const readRoutes = new Set([
-  "/api/ai/models", "/api/ai/media/models", "/api/ai/media/balance", "/api/ai/media/balanceEvents",
+  "/api/ai/media/job", "/api/ai/models", "/api/ai/media/models", "/api/ai/media/balance", "/api/ai/media/balanceEvents",
   "/api/providers/media/list", "/api/providers/models", "/api/nodes/get", "/api/nodes/files",
   "/api/tools/get", "/api/tools/client", "/api/tools/renderers", "/api/ext/list", "/api/ext/read",
   "/api/skills/list", "/api/skills/get", "/api/skills/read", "/api/agents/get", "/api/agents/read",

@@ -87,8 +87,8 @@
               class="sendButton"
               :icon="generating ? IconPlayerStop : IconArrowUp"
               :disabled="deleting || uploading || (!generating && (!generationPrompt || !selectedModel))"
-              :title="generating ? '停止生成' : '生成视频'"
-              :aria-label="generating ? '停止生成' : '生成视频'"
+              :title="generating ? '停止等待（任务继续）' : node.data.pendingMediaTask ? '继续查看生成进度' : '生成视频'"
+              :aria-label="generating ? '停止等待（任务继续）' : node.data.pendingMediaTask ? '继续查看生成进度' : '生成视频'"
               @click="generating ? generationController?.abort() : startGeneration().catch((error) => showNodeError(error, '视频生成失败'))" />
           </div>
         </div>
@@ -243,6 +243,7 @@ const previewUrl = files.useFileUrl(
 );
 
 onMounted(() => {
+  void resumeGeneration();
   window.addEventListener("toonflow:plugin-installed", refreshProviderModels);
   window.addEventListener("toonflow:provider-config-changed", refreshProviderModels);
   void loadModels().catch(error => { if (!disposed) showNodeError(error, "模型读取失败"); });
@@ -306,7 +307,23 @@ function loadModels() {
   return modelsRequest;
 }
 
+async function resumeGeneration() {
+  const controller = new AbortController();
+  try {
+    const { directory } = await files.getWorkspaceFiles().list();
+    if (disposed || generating.value || deleting.value || !ai.hasPendingMedia("video", directory, `assets/${id}`)) return;
+    generationController = controller;
+    generation = generationState.run(async () => {
+      const results = await ai.resumeMedia("video", directory, `assets/${id}`, controller.signal);
+      controller.signal.throwIfAborted();
+      if (results?.[0]) outputs.value.video = { dataType: "VIDEO", value: { url: results[0].path, mimeType: results[0].mimeType } };
+    }).catch(error => { if (!disposed) showNodeError(error, "恢复生成任务失败"); }).finally(() => { generationController = undefined; });
+    await generation;
+  } catch (error) { if (!disposed) showNodeError(error, "恢复生成任务失败"); }
+}
+
 async function startGeneration() {
+  if (node.data.pendingMediaTask) { await resumeGeneration(); return { status: "generating" }; }
   const choice = selectedModel.value;
   const input = generationInput.value;
   if (generating.value) throw new Error("视频正在生成，请等待完成");
@@ -319,7 +336,7 @@ async function startGeneration() {
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();
   generationController = controller;
-  // ACT: 工具立即返回，任务由节点持有，停止或卸载时取消。
+  // ACT: 工具立即返回，任务在服务端持久化，停止或卸载只结束界面等待。
   generation = generationState.run(() => workspace
     .list()
     .then(({ directory }) => {
@@ -443,7 +460,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "generateVideo",
-  description: "启动此节点的后台视频生成，使用当前提示词、模型、模式、时长、分辨率、比例和参考素材；立即返回已开始，用 getGenerationStatus 查询完成结果，cancelGeneration 停止生成",
+  description: "启动此节点的后台视频生成，使用当前提示词、模型、模式、时长、分辨率、比例和参考素材；立即返回已开始，用 getGenerationStatus 查询完成结果，cancelGeneration 停止等待，已提交的任务继续在后台运行",
   parameters: z.strictObject({}),
   execute(_args, { signal }) {
     signal?.throwIfAborted();

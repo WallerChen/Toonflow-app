@@ -19,6 +19,8 @@ export type NodeOptions<T extends NodeOutputs = NodeOutputs> = {
 
 export function useNode<T extends NodeOutputs = NodeOutputs>(options: NodeOptions<T> = {}) {
   const { id, node } = useFlowNode<NodeData>();
+  const pending = node.data.pendingMediaTask as { input?: { outputDirectory?: string } } | undefined;
+  if (pending && pending.input?.outputDirectory !== `assets/${id}`) delete node.data.pendingMediaTask;
   const documentContext = inject<NodeDocumentContext | undefined>("nodeDocument", undefined);
   const getNodeConfig = inject<((nodeType: string) => Record<string, unknown>) | undefined>("nodeConfig", undefined);
   const config = computed(() => readonly(getNodeConfig?.(node.type ?? "") ?? {}));
@@ -53,7 +55,7 @@ export function useNode<T extends NodeOutputs = NodeOutputs>(options: NodeOption
     outputs,
     nodeEvent,
     nodeTools,
-    ai: useNodeAi(),
+    ai: useNodeAi(() => node.data),
     ffmpeg: useNodeFfmpeg(),
     files: {
       getWorkspaceFiles,

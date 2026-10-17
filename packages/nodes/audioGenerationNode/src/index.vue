@@ -49,8 +49,8 @@
               class="sendButton"
               :icon="generating ? IconPlayerStop : IconArrowUp"
               :disabled="deleting || uploading || actions?.processing || (!generating && (!generationPrompt || !selectedModel || (hostedAudio && (generationPrompt.length < 50 || generationPrompt.length > 6000))))"
-              :title="generating ? '停止生成' : '生成音频'"
-              :aria-label="generating ? '停止生成' : '生成音频'"
+              :title="generating ? '停止等待（任务继续）' : node.data.pendingMediaTask ? '继续查看生成进度' : '生成音频'"
+              :aria-label="generating ? '停止等待（任务继续）' : node.data.pendingMediaTask ? '继续查看生成进度' : '生成音频'"
               @click="generating ? generationController?.abort() : startGeneration().catch(error => showNodeError(error, '音频生成失败'))" />
           </div>
         </div>
@@ -151,6 +151,7 @@ nodeEvent.on("canConnect", (connection, context) => {
 });
 
 onMounted(() => {
+  void resumeGeneration();
   window.addEventListener("toonflow:plugin-installed", refreshProviderModels);
   window.addEventListener("toonflow:provider-config-changed", refreshProviderModels);
   void refreshProviderModels();
@@ -198,7 +199,23 @@ function loadModels() {
   return modelsRequest;
 }
 
+async function resumeGeneration() {
+  const controller = new AbortController();
+  try {
+    const { directory } = await files.getWorkspaceFiles().list();
+    if (disposed || generating.value || deleting.value || !ai.hasPendingMedia("audio", directory, `assets/${id}`)) return;
+    generationController = controller;
+    generation = generationState.run(async () => {
+      const results = await ai.resumeMedia("audio", directory, `assets/${id}`, controller.signal);
+      controller.signal.throwIfAborted();
+      if (results?.[0]) outputs.value.audio = { dataType: "AUDIO", value: { url: results[0].path, mimeType: results[0].mimeType } };
+    }).catch(error => { if (!disposed) showNodeError(error, "恢复生成任务失败"); }).finally(() => { generationController = undefined; });
+    await generation;
+  } catch (error) { if (!disposed) showNodeError(error, "恢复生成任务失败"); }
+}
+
 async function startGeneration() {
+  if (node.data.pendingMediaTask) { await resumeGeneration(); return { status: "generating" }; }
   if (busy.value || disposed) throw new Error("音频正在处理或节点已关闭，请稍后重试");
   const input = generationInput.value;
   if (!input) throw new Error("请先选择音频模型");

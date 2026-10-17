@@ -11,7 +11,7 @@ async function call(context: ProviderContext, path: string, body?: unknown) {
     signal: context.signal,
   });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.message || "SiVideoGen service unavailable");
+  if (!response.ok) throw Object.assign(new Error(result.message || "SiVideoGen service unavailable"), { status: response.status });
   return result;
 }
 
@@ -28,12 +28,15 @@ export default {
     return { balance: result.balance, unit: "credits" };
   },
   async generateImage(request) {
-    return call(this, "generate", { type: "image", request, operationId: `${Date.now()}-${Math.random().toString(36).slice(2)}` });
+    const { operationId, ...input } = request as ImageRequest & { operationId?: string };
+    return call(this, "generate", { type: "image", request: input, operationId: operationId ?? `${Date.now()}-${Math.random().toString(36).slice(2)}` });
   },
   async generateVideo(request) {
-    return call(this, "generate", { type: "video", request, operationId: `${Date.now()}-${Math.random().toString(36).slice(2)}` });
+    const { operationId, ...input } = request as VideoRequest & { operationId?: string };
+    return call(this, "generate", { type: "video", request: input, operationId: operationId ?? `${Date.now()}-${Math.random().toString(36).slice(2)}` });
   },
   async generateAudio(request) {
-    return call(this, "generate", { type: "audio", request, operationId: `${Date.now()}-${Math.random().toString(36).slice(2)}` });
+    const { operationId, ...input } = request as AudioRequest & { operationId?: string };
+    return call(this, "generate", { type: "audio", request: input, operationId: operationId ?? `${Date.now()}-${Math.random().toString(36).slice(2)}` });
   },
 } satisfies ProviderDefinition<typeof rules>;

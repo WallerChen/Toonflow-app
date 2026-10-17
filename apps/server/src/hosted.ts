@@ -121,7 +121,7 @@ async function generate(actor: Actor, input: any) {
     const deadline = Date.now() + 46 * 60_000;
     while (Date.now() < deadline) {
       const { job } = await account(actor, type === "audio" ? `/api/bedtime/jobs/${jobId}` : `/api/studio/core/api/jobs/${jobId}`);
-      if (job.status === "failed") throw error(job.error ?? "Generation failed; held credits are returned by SiVideoGen.");
+      if (job.status === "failed") throw error(job.error ?? "Generation failed; held credits are returned by SiVideoGen.", 422);
       if (job.status === "succeeded") {
         const results = type === "audio" ? [{ url: `/api/bedtime/assets/${jobId}` }] : type === "image" ? job.images : job.video ? [job.video] : [];
         if (!results?.length) throw error("The job finished without an available result.");
