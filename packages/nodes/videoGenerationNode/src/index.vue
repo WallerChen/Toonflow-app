@@ -10,9 +10,9 @@
     :bottomWidth="660"
     :style="{ width: previewUrl && videoWidth ? `${videoWidth + 18}px` : undefined }">
     <template #topActions>
-      <el-button :icon="IconMusic" text :disabled="!outputFile || generating || deleting || uploading || actions?.processing" @click.stop="actions?.open('extractAudio')">提取音轨</el-button>
-      <el-button :icon="IconLayersSubtract" text :disabled="!outputFile || generating || deleting || uploading || actions?.processing" @click.stop="actions?.open('separate')">分离音视频</el-button>
-      <el-button :icon="IconScissors" text :disabled="!outputFile || generating || deleting || uploading || actions?.processing" @click.stop="actions?.open('trim')">截取片段</el-button>
+      <el-button v-if="!hostedVideo" :icon="IconMusic" text :disabled="!outputFile || generating || deleting || uploading || actions?.processing" @click.stop="actions?.open('extractAudio')">提取音轨</el-button>
+      <el-button v-if="!hostedVideo" :icon="IconLayersSubtract" text :disabled="!outputFile || generating || deleting || uploading || actions?.processing" @click.stop="actions?.open('separate')">分离音视频</el-button>
+      <el-button v-if="!hostedVideo" :icon="IconScissors" text :disabled="!outputFile || generating || deleting || uploading || actions?.processing" @click.stop="actions?.open('trim')">截取片段</el-button>
       <mediaHistory mediaType="video" :current="outputFile" :disabled="generating || deleting || uploading" @select="outputs.video = { dataType: 'VIDEO', value: $event }" />
       <el-button :icon="IconTransfer" :loading="uploading" :disabled="generating || deleting" text title="替换视频" aria-label="替换视频" @click.stop="fileInput?.click()">替换视频</el-button>
       <input ref="fileInput" type="file" accept="video/*" hidden aria-label="选择替换视频" :disabled="generating || deleting || uploading" @change="replaceOutput" />
@@ -87,8 +87,8 @@
               class="sendButton"
               :icon="generating ? IconPlayerStop : IconArrowUp"
               :disabled="deleting || uploading || (!generating && (!generationPrompt || !selectedModel))"
-              :title="generating ? '停止生成' : '生成视频'"
-              :aria-label="generating ? '停止生成' : '生成视频'"
+              :title="generating ? '停止等待（任务继续）' : node.data.pendingMediaTask ? '继续查看生成进度' : '生成视频'"
+              :aria-label="generating ? '停止等待（任务继续）' : node.data.pendingMediaTask ? '继续查看生成进度' : '生成视频'"
               @click="generating ? generationController?.abort() : startGeneration().catch((error) => showNodeError(error, '视频生成失败'))" />
           </div>
         </div>
@@ -99,6 +99,7 @@
 </template>
 
 <script setup lang="ts">
+const hostedVideo = typeof document !== "undefined" && document.documentElement.dataset.hosted === "sivideogen";
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElDropdown, ElDropdownMenu, ElDropdownItem } from "element-plus";
 import { IconCameraAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer, IconMusic, IconLayersSubtract, IconScissors, IconPhotoScan, IconPlayerSkipBack, IconPlayerSkipForward } from "@tabler/icons-vue";
@@ -244,7 +245,7 @@ const previewUrl = files.useFileUrl(
 onMounted(() => {
   window.addEventListener("toonflow:plugin-installed", refreshProviderModels);
   window.addEventListener("toonflow:provider-config-changed", refreshProviderModels);
-  void loadModels().catch(error => { if (!disposed) showNodeError(error, "模型读取失败"); });
+  void loadModels().catch(error => { if (!disposed) showNodeError(error, "模型读取失败"); }).finally(() => { if (!disposed) void resumeGeneration(); });
 });
 onScopeDispose(() => {
   disposed = true;
@@ -305,7 +306,23 @@ function loadModels() {
   return modelsRequest;
 }
 
+async function resumeGeneration() {
+  const controller = new AbortController();
+  try {
+    const { directory } = await files.getWorkspaceFiles().list();
+    if (disposed || generating.value || deleting.value || !ai.hasPendingMedia("video", directory, `assets/${id}`)) return;
+    generationController = controller;
+    generation = generationState.run(async () => {
+      const results = await ai.resumeMedia("video", directory, `assets/${id}`, controller.signal);
+      controller.signal.throwIfAborted();
+      if (results?.[0]) outputs.value.video = { dataType: "VIDEO", value: { url: results[0].path, mimeType: results[0].mimeType } };
+    }).catch(error => { if (!disposed) showNodeError(error, "恢复生成任务失败"); }).finally(() => { generationController = undefined; });
+    await generation;
+  } catch (error) { if (!disposed) showNodeError(error, "恢复生成任务失败"); }
+}
+
 async function startGeneration() {
+  if (node.data.pendingMediaTask) { await resumeGeneration(); return { status: "generating" }; }
   const choice = selectedModel.value;
   const input = generationInput.value;
   if (generating.value) throw new Error("视频正在生成，请等待完成");
@@ -318,7 +335,7 @@ async function startGeneration() {
   const workspace = files.getWorkspaceFiles();
   const controller = new AbortController();
   generationController = controller;
-  // ACT: 工具立即返回，任务由节点持有，停止或卸载时取消。
+  // ACT: 工具立即返回，任务在服务端持久化，停止或卸载只结束界面等待。
   generation = generationState.run(() => workspace
     .list()
     .then(({ directory }) => {
@@ -442,7 +459,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "generateVideo",
-  description: "启动此节点的后台视频生成，使用当前提示词、模型、模式、时长、分辨率、比例和参考素材；立即返回已开始，用 getGenerationStatus 查询完成结果，cancelGeneration 停止生成",
+  description: "启动此节点的后台视频生成，使用当前提示词、模型、模式、时长、分辨率、比例和参考素材；立即返回已开始，用 getGenerationStatus 查询完成结果，cancelGeneration 停止等待，已提交的任务继续在后台运行",
   parameters: z.strictObject({}),
   execute(_args, { signal }) {
     signal?.throwIfAborted();

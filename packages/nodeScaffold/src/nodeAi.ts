@@ -167,7 +167,10 @@ async function requestModel(input: NodeAiRequest, context: Context, model: Model
   return stream;
 }
 
-export function useNodeAi() {
+type pendingMediaTask = { id: string; mediaType: "image" | "video" | "audio"; input: NodeImageRequest | NodeVideoRequest | NodeAudioRequest };
+type mediaTaskStatus = { id: string; status: "queued" | "running" | "succeeded" | "failed" | "interrupted"; files?: { path: string; mimeType: string; mediaType: "image" | "video" | "audio" }[]; message?: string };
+
+export function useNodeAi(getState?: () => Record<string, unknown>) {
   const controller = new AbortController();
   onScopeDispose(() => controller.abort());
   const requestSignal = (signal?: AbortSignal) => signal ? AbortSignal.any([controller.signal, signal]) : controller.signal;
@@ -247,13 +250,87 @@ export function useNodeAi() {
     }
   }
 
-  async function generateMedia<T extends "image" | "video" | "audio">(mediaType: T, input: NodeImageRequest | NodeVideoRequest | NodeAudioRequest, signal?: AbortSignal) {
-    return readResult<{ path: string; mimeType: string; mediaType: T }[]>(await fetch("/api/ai/media/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" },
-      body: JSON.stringify({ ...input, mediaType }),
-      signal: requestSignal(signal),
-    }));
+  const taskStorageKey = (directory: string, outputDirectory: string) => `toonflow.mediaTask:${directory}:${outputDirectory}`;
+  function pendingTask(mediaType: pendingMediaTask["mediaType"], directory: string, outputDirectory: string) {
+    let task = getState?.().pendingMediaTask as pendingMediaTask | undefined;
+    try { task ??= JSON.parse(localStorage.getItem(taskStorageKey(directory, outputDirectory)) ?? "null") ?? undefined; } catch {}
+    if (task?.mediaType === mediaType && task.input?.directory === directory && task.input.outputDirectory === outputDirectory && /^[a-zA-Z0-9_-]{8,100}$/.test(task.id)) return task;
+    return undefined;
+  }
+  function saveTask(task: pendingMediaTask) {
+    const state = getState?.();
+    if (state) state.pendingMediaTask = task;
+    try { localStorage.setItem(taskStorageKey(task.input.directory, task.input.outputDirectory), JSON.stringify(task)); } catch {}
+  }
+  function forgetTask(task: pendingMediaTask) {
+    const state = getState?.();
+    if ((state?.pendingMediaTask as pendingMediaTask | undefined)?.id === task.id) delete state!.pendingMediaTask;
+    try {
+      const key = taskStorageKey(task.input.directory, task.input.outputDirectory);
+      if (JSON.parse(localStorage.getItem(key) ?? "null")?.id === task.id) localStorage.removeItem(key);
+    } catch {}
+  }
+  async function pausePolling(signal: AbortSignal, ms: number) {
+    signal.throwIfAborted();
+    await new Promise<void>((resolve, reject) => {
+      const cancel = () => { clearTimeout(timer); reject(signal.reason); };
+      const timer = setTimeout(() => { signal.removeEventListener("abort", cancel); resolve(); }, ms);
+      signal.addEventListener("abort", cancel, { once: true });
+    });
+  }
+  async function waitForTask<T extends pendingMediaTask["mediaType"]>(task: pendingMediaTask, signal?: AbortSignal) {
+    const waiting = requestSignal(signal);
+    let errors = 0;
+    let submit = true;
+    const request = async (submit = false): Promise<mediaTaskStatus> => {
+      const response = await fetch(submit ? "/api/ai/media/generate" : `/api/ai/media/job?${new URLSearchParams({ directory: task.input.directory, id: task.id })}`, {
+        method: submit ? "POST" : "GET",
+        headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" },
+        ...(submit ? { body: JSON.stringify({ ...task.input, mediaType: task.mediaType, operationId: task.id }) } : {}),
+        signal: AbortSignal.any([waiting, AbortSignal.timeout(20000)]),
+      });
+      if (!submit && response.status === 404) return request(true);
+      if (response.status === 401 || response.status === 403) throw Object.assign(new Error("Sign in again to resume this generation."), { terminal: true });
+      if (submit && [400, 409, 422, 429].includes(response.status)) {
+        const result = await response.json();
+        if (response.status !== 409) forgetTask(task);
+        throw Object.assign(new Error(result.message || "Generation could not be submitted."), { terminal: true });
+      }
+      return readResult<mediaTaskStatus>(response);
+    };
+    // 每次 HTTP 请求均有短超时；网络重试沿用同一个 ID，不创建第二个付费任务。
+    while (true) {
+      waiting.throwIfAborted();
+      let job: mediaTaskStatus;
+      try { job = await request(submit); submit = false; errors = 0; }
+      catch (cause) {
+        waiting.throwIfAborted();
+        if ((cause as { terminal?: boolean }).terminal || ++errors >= 8) throw cause;
+        await pausePolling(waiting, Math.min(15000, errors * 2000));
+        continue;
+      }
+      if (job.status === "succeeded") {
+        if (!job.files?.length) throw new Error("The task finished without an available result.");
+        forgetTask(task);
+        return job.files as { path: string; mimeType: string; mediaType: T }[];
+      }
+      if (job.status === "failed" || job.status === "interrupted") {
+        if (job.status === "failed") forgetTask(task);
+        throw new Error(job.message || "Generation failed.");
+      }
+      await pausePolling(waiting, 3000);
+    }
+  }
+  async function resumeMedia<T extends pendingMediaTask["mediaType"]>(mediaType: T, directory: string, outputDirectory: string, signal?: AbortSignal) {
+    const task = pendingTask(mediaType, directory, outputDirectory);
+    if (!task) return null;
+    saveTask(task);
+    return waitForTask<T>(task, signal);
+  }
+  async function generateMedia<T extends pendingMediaTask["mediaType"]>(mediaType: T, input: NodeImageRequest | NodeVideoRequest | NodeAudioRequest, signal?: AbortSignal) {
+    const task = pendingTask(mediaType, input.directory, input.outputDirectory) ?? { id: crypto.randomUUID(), mediaType, input: JSON.parse(JSON.stringify(input)) };
+    saveTask(task);
+    return waitForTask<T>(task, signal);
   }
 
   function generateImage(input: NodeImageRequest, signal?: AbortSignal) {
@@ -318,5 +395,5 @@ export function useNodeAi() {
     return { text, ...(reasoning ? { reasoning } : {}) };
   }
 
-  return { getModels, getMediaModels, getMediaPrice, generateImage, generateVideo, generateAudio, generate };
+  return { getModels, getMediaModels, getMediaPrice, generateImage, generateVideo, generateAudio, resumeMedia, hasPendingMedia: (type: pendingMediaTask["mediaType"], directory: string, outputDirectory: string) => Boolean(pendingTask(type, directory, outputDirectory)), generate };
 }

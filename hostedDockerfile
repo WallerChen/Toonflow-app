@@ -1,0 +1,15 @@
+FROM oven/bun:1.3.14 AS build
+WORKDIR /app
+COPY . .
+RUN sed -i 's#https://registry.npmmirror.com/#https://registry.npmjs.org/#g' bun.lock && bun install --frozen-lockfile
+RUN CFS_HOSTED=1 bun run build:server
+
+FROM oven/bun:1.3.14
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-noto-core fonts-noto-cjk && rm -rf /var/lib/apt/lists/*
+COPY --from=build --chown=bun:bun /app /app
+RUN mkdir -p /app/data && chown bun:bun /app/data
+USER bun
+ENV NODE_ENV=production CFS_STUDIO_DATA=/app/data CFS_STUDIO_HOST=0.0.0.0 CFS_STUDIO_PORT=4390
+EXPOSE 4390
+CMD ["bun", "--tsconfig-override", "apps/server/tsconfig.json", "apps/server/src/hostedStart.ts"]

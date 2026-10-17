@@ -1,0 +1,11 @@
+.git
+.hutch
+node_modules
+**/node_modules
+build
+data
+work
+backup
+.env
+.env.*
+*.log

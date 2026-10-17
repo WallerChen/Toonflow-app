@@ -1,0 +1,22 @@
+services:
+  studio:
+    build:
+      context: .
+      dockerfile: hostedDockerfile
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    mem_limit: 2g
+    cpus: 2
+    ports: ["127.0.0.1:4390:4390"]
+    tmpfs: [/tmp]
+    environment:
+      CFS_SITE_ORIGIN: https://sivideogen.com
+      CFS_STUDIO_PROXY_KEY: ${CFS_STUDIO_PROXY_KEY:?Set the server-only proxy key}
+      CFS_MAX_EDITORS: 4
+    volumes: [studioData:/app/data]
+volumes:
+  studioData:

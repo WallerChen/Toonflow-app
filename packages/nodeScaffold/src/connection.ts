@@ -21,6 +21,7 @@ export type NodeData = {
   label?: string;
   handles?: NodeHandle[];
   outputs?: NodeOutputs;
+  pendingMediaTask?: unknown;
 };
 
 function getDataTypes(dataType: NodeHandle["dataType"]) {

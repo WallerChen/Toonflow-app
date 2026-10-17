@@ -25,6 +25,7 @@ let connectionRequest: Promise<MobileConnection> | undefined;
 let connectionTimer: ReturnType<typeof setTimeout> | undefined;
 
 export async function refreshMobileConnection() {
+  if ((location.pathname.startsWith("/toonflow") || Boolean(document.querySelector("#toonflow-native")))) { deviceConnectionSupported.value = false; return mobileConnection.value; }
   if (connectionRequest) return connectionRequest;
   clearTimeout(connectionTimer);
   connectionRequest = (async () => {

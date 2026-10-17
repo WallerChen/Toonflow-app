@@ -12,7 +12,7 @@
     <template v-if="editor?.mode" #top><div ref="paintToolbar" /></template>
     <template #topActions>
       <el-button class="panoramaButton" :icon="IconPanoramaHorizontal" :disabled="uploading || editor?.busy || lighting?.generating || multiAngle?.generating || gridSplit?.splitting || inpaintPrompt?.creating || panorama?.busy || !previewUrl" text title="全景图" aria-label="全景图" @click.stop="panorama?.open($event)">全景图<icon-chevron-down class="menuChevron" :size="14" /></el-button>
-      <el-button :icon="IconBrush" :disabled="uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="局部重绘" aria-label="局部重绘" @click.stop="startEditor('inpaint')">局部重绘</el-button>
+      <el-button v-if="!hostedImage" :icon="IconBrush" :disabled="uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="局部重绘" aria-label="局部重绘" @click.stop="startEditor('inpaint')">局部重绘</el-button>
       <el-button :icon="IconSun" :disabled="uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="打光" aria-label="打光" @click.stop="openLighting">打光</el-button>
       <el-button :icon="IconCameraRotate" :disabled="uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="多角度" aria-label="多角度" @click.stop="openMultiAngle">多角度</el-button>
       <el-button :icon="IconLayoutGrid" :disabled="uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl" :loading="gridSplit?.splitting" text title="宫格切分" aria-label="宫格切分" @click.stop="gridSplit?.open($event)">宫格切分</el-button>
@@ -70,6 +70,7 @@
 </template>
 
 <script setup lang="ts">
+const hostedImage = typeof document !== "undefined" && document.documentElement.dataset.hosted === "sivideogen";
 import { computed, nextTick, ref } from "vue";
 import { IconPhoto, IconUpload, IconTransfer, IconLayoutGrid, IconBrush, IconPencil, IconSun, IconCameraRotate, IconPanoramaHorizontal, IconChevronDown } from "@tabler/icons-vue";
 import { ElButton, ElImageViewer, ElMessage } from "element-plus";

@@ -26,6 +26,7 @@ export async function createApp({
   skillsRoot,
   agentsRoot,
   pluginRevision,
+  configureApp,
 }: {
   webRoot: string;
   appVersion?: string;
@@ -37,6 +38,7 @@ export async function createApp({
   skillsRoot?: string;
   agentsRoot?: string;
   pluginRevision?: string;
+  configureApp?: (app: express.Express) => void;
 }) {
   // conf 由下方的路由动态加载，必须先确定整个进程共用的数据目录。
   if (dataDirectory) process.env.TOONFLOW_DATA_DIR = resolve(dataDirectory);
@@ -83,6 +85,7 @@ export async function createApp({
   app.use(["/api/workspaces/files/write", "/api/assets/save"], express.raw({ type: "application/octet-stream", limit: "100mb" }));
   app.use(express.json({ limit: "100mb" }));
   app.use(express.urlencoded({ extended: true, limit: "100mb" }));
+  configureApp?.(app);
   app.use("/api/desktop", desktopRequest);
 
   const { default: initializeProviderModels } = await import("@/utils/ai/initialize");

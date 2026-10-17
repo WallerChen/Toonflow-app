@@ -12,7 +12,7 @@
     <template v-if="editor?.mode" #top><div ref="paintToolbar" /></template>
     <template #topActions>
       <el-button class="panoramaButton" :icon="IconPanoramaHorizontal" :disabled="generating || deleting || uploading || editor?.busy || lighting?.generating || multiAngle?.generating || gridSplit?.splitting || panorama?.busy || !previewUrl" text title="全景图" aria-label="全景图" @click.stop="panorama?.open($event)">全景图<icon-chevron-down class="menuChevron" :size="14" /></el-button>
-      <el-button :icon="IconBrush" :disabled="generating || deleting || uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="局部重绘" aria-label="局部重绘" @click.stop="startEditor('inpaint')">局部重绘</el-button>
+      <el-button v-if="!hostedImage" :icon="IconBrush" :disabled="generating || deleting || uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="局部重绘" aria-label="局部重绘" @click.stop="startEditor('inpaint')">局部重绘</el-button>
       <el-button :icon="IconSun" :disabled="generating || deleting || uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="打光" aria-label="打光" @click.stop="openLighting">打光</el-button>
       <el-button :icon="IconCameraRotate" :disabled="generating || deleting || uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl || gridSplit?.splitting" text title="多角度" aria-label="多角度" @click.stop="openMultiAngle">多角度</el-button>
       <el-button :icon="IconLayoutGrid" :disabled="generating || deleting || uploading || lighting?.generating || multiAngle?.generating || panorama?.busy || !previewUrl" :loading="gridSplit?.splitting" text title="宫格切分" aria-label="宫格切分" @click.stop="gridSplit?.open($event)">宫格切分</el-button>
@@ -89,8 +89,8 @@
               class="sendButton"
               :icon="generating ? IconPlayerStop : IconArrowUp"
               :disabled="deleting || uploading || (!generating && (editor?.busy || !generationPrompt || !selectedModel))"
-              :title="generating ? '停止生成' : '生成图片'"
-              :aria-label="generating ? '停止生成' : '生成图片'"
+              :title="generating ? '停止等待（任务继续）' : node.data.pendingMediaTask ? '继续查看生成进度' : '生成图片'"
+              :aria-label="generating ? '停止等待（任务继续）' : node.data.pendingMediaTask ? '继续查看生成进度' : '生成图片'"
               @click="generating ? generationController?.abort() : startGeneration().catch((error) => showNodeError(error, '图片生成失败'))" />
           </div>
         </div>
@@ -110,6 +110,7 @@
 </template>
 
 <script setup lang="ts">
+const hostedImage = typeof document !== "undefined" && document.documentElement.dataset.hosted === "sivideogen";
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading, ElImageViewer } from "element-plus";
 import { IconCheck, IconPhotoAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer, IconLayoutGrid, IconBrush, IconPencil, IconSun, IconCameraRotate, IconPanoramaHorizontal, IconChevronDown } from "@tabler/icons-vue";
@@ -242,7 +243,7 @@ const previewUrl = files.useFileUrl(
 onMounted(() => {
   window.addEventListener("toonflow:plugin-installed", refreshProviderModels);
   window.addEventListener("toonflow:provider-config-changed", refreshProviderModels);
-  void loadModels().catch(error => { if (!disposed) showNodeError(error, "模型读取失败"); });
+  void loadModels().catch(error => { if (!disposed) showNodeError(error, "模型读取失败"); }).finally(() => { if (!disposed) void resumeGeneration(); });
 });
 onScopeDispose(() => {
   disposed = true;
@@ -316,7 +317,23 @@ async function confirmInpaint() {
   await inpaintEditor.createInpaint({ prompt, images }, new AbortController().signal);
 }
 
+async function resumeGeneration() {
+  const controller = new AbortController();
+  try {
+    const { directory } = await files.getWorkspaceFiles().list();
+    if (disposed || generating.value || deleting.value || !ai.hasPendingMedia("image", directory, `assets/${id}`)) return;
+    generationController = controller;
+    generation = generationState.run(async () => {
+      const results = await ai.resumeMedia("image", directory, `assets/${id}`, controller.signal);
+      controller.signal.throwIfAborted();
+      if (results?.[0]) outputs.value.image = { dataType: "IMAGE", value: { url: results[0].path, mimeType: results[0].mimeType } };
+    }).catch(error => { if (!disposed) showNodeError(error, "恢复生成任务失败"); }).finally(() => { generationController = undefined; });
+    await generation;
+  } catch (error) { if (!disposed) showNodeError(error, "恢复生成任务失败"); }
+}
+
 async function startGeneration() {
+  if (node.data.pendingMediaTask) { await resumeGeneration(); return { status: "generating" }; }
   const input = generationInput.value;
   if (generating.value) throw new Error("图片正在生成，请等待完成");
   if (panorama.value?.visible) throw new Error("请先关闭全景图，再启动图片生成");
@@ -334,7 +351,7 @@ async function startGeneration() {
   const controller = new AbortController();
   const inpaintData = data.value.inpaint;
   generationController = controller;
-  // ACT: 工具立即返回，任务由节点持有，停止或卸载时取消。
+  // ACT: 工具立即返回，任务在服务端持久化，停止或卸载只结束界面等待。
   generation = generationState.run(() => workspace.list()
     .then(({ directory }) => {
       controller.signal.throwIfAborted();
@@ -471,7 +488,7 @@ nodeTools.register({
 
 nodeTools.register({
   name: "generateImage",
-  description: "启动此节点的后台普通图片生成，使用普通生成提示词、模型、分辨率、比例和参考图片；局部重绘模式下须先退出；立即返回已开始，用 getGenerationStatus 查询完成结果，cancelGeneration 停止生成",
+  description: "启动此节点的后台普通图片生成，使用普通生成提示词、模型、分辨率、比例和参考图片；局部重绘模式下须先退出；立即返回已开始，用 getGenerationStatus 查询完成结果，cancelGeneration 停止等待，已提交的任务继续在后台运行",
   parameters: z.strictObject({}),
   execute(_args, { signal }) {
     signal?.throwIfAborted();

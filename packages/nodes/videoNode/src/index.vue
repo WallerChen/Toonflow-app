@@ -8,9 +8,9 @@
     :style="{ width: previewUrl && videoWidth ? `${videoWidth + 18}px` : undefined }"
     @fullscreen="player?.enterFullscreen()">
     <template #topActions>
-      <el-button :icon="IconMusic" text :disabled="!outputFile || uploading || exporting || actions?.processing" @click.stop="actions?.open('extractAudio')">提取音轨</el-button>
-      <el-button :icon="IconLayersSubtract" text :disabled="!outputFile || uploading || exporting || actions?.processing" @click.stop="actions?.open('separate')">分离音视频</el-button>
-      <el-button :icon="IconScissors" text :disabled="!outputFile || uploading || exporting || actions?.processing" @click.stop="actions?.open('trim')">截取片段</el-button>
+      <el-button v-if="!hostedVideo" :icon="IconMusic" text :disabled="!outputFile || uploading || exporting || actions?.processing" @click.stop="actions?.open('extractAudio')">提取音轨</el-button>
+      <el-button v-if="!hostedVideo" :icon="IconLayersSubtract" text :disabled="!outputFile || uploading || exporting || actions?.processing" @click.stop="actions?.open('separate')">分离音视频</el-button>
+      <el-button v-if="!hostedVideo" :icon="IconScissors" text :disabled="!outputFile || uploading || exporting || actions?.processing" @click.stop="actions?.open('trim')">截取片段</el-button>
       <el-button
         :icon="IconTransfer"
         :loading="uploading"
@@ -60,6 +60,7 @@
 </template>
 
 <script setup lang="ts">
+const hostedVideo = typeof document !== "undefined" && document.documentElement.dataset.hosted === "sivideogen";
 import { computed, nextTick, ref } from "vue";
 import { IconVideo, IconUpload, IconTransfer, IconMusic, IconLayersSubtract, IconScissors, IconPhotoScan, IconPlayerSkipBack, IconPlayerSkipForward } from "@tabler/icons-vue";
 import { ElButton, ElMessage, ElProgress, ElDropdown, ElDropdownMenu, ElDropdownItem } from "element-plus";

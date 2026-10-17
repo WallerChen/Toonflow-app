@@ -1,5 +1,6 @@
 <template>
-  <div class="ui">
+  <div v-if="isNative" class="ui"><p class="intro">界面语言使用网站顶部的语言菜单切换，外观与 SiVideoGen 工作台保持一致。</p></div>
+  <div v-else class="ui">
     <p class="intro">让创作空间更合你的习惯，修改会自动保存。</p>
 
     <section v-if="isMobile" class="settingSection" aria-labelledby="mobileScaleTitle">
@@ -133,6 +134,7 @@
 </template>
 
 <script setup lang="ts">
+import { isNative } from "@/lib/hosted";
 import { nextTick, ref, watchEffect } from "vue";
 import {
   IconSun,

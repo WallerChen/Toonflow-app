@@ -166,6 +166,7 @@ export async function generateMedia(
   mediaType: "image" | "video" | "audio",
   request: MediaGenerationRequest,
   signal?: AbortSignal,
+  operationId?: string,
 ): Promise<GeneratedMedia[]> {
   signal?.throwIfAborted();
   if (!request.prompt.trim()) invalid("请输入生成提示词");
@@ -185,6 +186,7 @@ export async function generateMedia(
   try {
     signal?.throwIfAborted();
     const { type, ...parameters } = prepared;
+    if (request.providerId === "sivideogen" && operationId) Object.assign(parameters, { operationId });
     const assets = type === "audio" ? await provider.generateAudio!(parameters as AudioRequest)
       : type === "image" ? await provider.generateImage!(parameters as ImageRequest) : await provider.generateVideo!(parameters as VideoRequest);
     if (!Array.isArray(assets) || !assets.length) invalid("供应商未返回生成结果");
